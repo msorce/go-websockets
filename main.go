@@ -3,19 +3,53 @@ import (
 	"fmt"
 	"net/http"
 	"log"
+	"github.com/gorilla/websocket"
 )
+
+var upgrader = websocket.Upgrader {
+	ReadBufferSize:1024,
+	WriteBufferSize: 1024,
+}
 
 func homePage(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Home Page")
 }
 
+// this allows us to listen for incoming messages
+func reader(conn *websocket.Conn) {
+	for {
+		messageType, p, err := conn.ReadMessage()
+		
+		// handle error
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		
+		log.Println(string(p))
+		
+		if err := conn.WriteMessage(messageType, p); err != nil {
+			log.Println(err)
+			return 
+		}
+	}
+}
+
 func wsEndpoint(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "WebSocket Endpoint")
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	
+	ws, err := upgrader.Upgrade(w, r, nil) 
+	if err != nil {
+		log.Println(err)
+	}
+
+	log.Println("client connection successful")
+	reader(ws)
 }
 
 func setupRoutes() {
 	http.HandleFunc("/", homePage)
-	http.HandleFunc("ws", wsEndpoint)
+	http.HandleFunc("/ws", wsEndpoint)
 }
 
 func main() {
